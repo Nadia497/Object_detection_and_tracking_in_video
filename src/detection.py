@@ -3,7 +3,7 @@ import cv2 as cv
 TRACKING_ROI = None 
 
 # 1. Charger la vidéo
-capture = cv.VideoCapture(r'C:\Users\XPS\Documents\Object_detection_and_tracking_in_video\data\video1.mp4')
+capture = cv.VideoCapture('\data\video1.mp4')
 
 if not capture.isOpened():
     print("Erreur : Impossible d'ouvrir la vidéo. Vérifiez le chemin d'accès.")
@@ -18,7 +18,7 @@ if not isTrue:
     cv.destroyAllWindows()
     exit()
 
-## 🎯 Sélection Manuelle de la ROI
+## Sélection Manuelle de la ROI
 # Affiche la fenêtre et attend que l'utilisateur dessine un rectangle avec la souris.
 #cv.namedWindow("Selection de l'objet - Tracez un rectangle et appuyez sur ENTREE", cv.WINDOW_NORMAL)
 
