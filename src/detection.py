@@ -7,7 +7,7 @@ def select_manual_roi(frame):
     """
     window_name = "Selection de l'objet - Tracez un rectangle et appuyez sur ENTREE"
     
-    # Configuration de la fenêtre
+    # Configuration de la fenêtrez
     cv.namedWindow(window_name, cv.WINDOW_NORMAL)
     cv.resizeWindow(window_name, 1280, 720) # Taille confortable
 
