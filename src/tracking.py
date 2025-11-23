@@ -2,20 +2,94 @@ import cv2 as cv
 import numpy as np
 import preprocessing as prep
 
-# --- 1. STATIC TRACKER (Ton code "Livrable simple") ---
-class StaticTracker:
+# --- 1. COLOR TRACKER  ---
+# Dans tracking.py
+
+# Dans tracking.py
+
+class ColorTracker:
     def __init__(self):
-        self.roi = None
+        self.lower_bound = None
+        self.upper_bound = None
+        # Noyau large pour bien fusionner l'objet
+        self.kernel = np.ones((11, 11), np.uint8)
+        
+        self.last_center = None 
+        self.last_area = 0
 
     def init_tracker(self, frame, roi):
-        self.roi = roi # On garde juste les coordonnées fixes
+        x, y, w, h = roi
+        roi_frame = frame[y:y+h, x:x+w]
+        
+        hsv_roi = cv.cvtColor(roi_frame, cv.COLOR_BGR2HSV)
+        avg_color = np.mean(hsv_roi, axis=(0, 1))
+        hue_center = avg_color[0]
+        
+        # --- CORRECTION DE L'ERREUR ICI ---
+        # On ajoute 'dtype=np.uint8' pour forcer le format entier
+        self.lower_bound = np.array([max(0, int(hue_center - 25)), 50, 50], dtype=np.uint8)
+        self.upper_bound = np.array([min(180, int(hue_center + 25)), 255, 255], dtype=np.uint8)
+        
+        # Initialisation position et surface
+        cx = int(x + w / 2)
+        cy = int(y + h / 2)
+        self.last_center = (cx, cy)
+        self.last_area = w * h
+
+        print(f"✅ Tracker initialisé. Surface initiale : {self.last_area} px")
+        print(f"   Seuils (uint8) : {self.lower_bound} -> {self.upper_bound}")
 
     def update(self, frame):
-        # On redessine simplement le rectangle initial
-        x, y, w, h = self.roi
         img_result = frame.copy()
-        cv.rectangle(img_result, (x, y), (x + w, y + h), (0, 255, 0), 2)
-        return img_result
+        hsv = cv.cvtColor(frame, cv.COLOR_BGR2HSV)
+        
+        # Maintenant ça ne plantera plus ici car les types sont corrects
+        mask = cv.inRange(hsv, self.lower_bound, self.upper_bound)
+        
+        # Nettoyage et fusion
+        mask = cv.erode(mask, self.kernel, iterations=1)
+        mask = cv.dilate(mask, self.kernel, iterations=3)
+        
+        contours, _ = cv.findContours(mask, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
+        
+        best_contour = None
+        min_dist = float('inf')
+
+        if contours and self.last_center is not None:
+            for c in contours:
+                area = cv.contourArea(c)
+                
+                # Filtre : On ignore les objets devenus trop petits (< 30% de la taille originale)
+                if area < (self.last_area * 0.3):
+                    continue
+                
+                M = cv.moments(c)
+                if M["m00"] == 0: continue
+                cx = int(M["m10"] / M["m00"])
+                cy = int(M["m01"] / M["m00"])
+                
+                # Distance avec la dernière position connue
+                dist = np.sqrt((cx - self.last_center[0])**2 + (cy - self.last_center[1])**2)
+                
+                if dist < min_dist:
+                    min_dist = dist
+                    best_contour = c
+            
+            if best_contour is not None:
+                x, y, w, h = cv.boundingRect(best_contour)
+                cv.rectangle(img_result, (x, y), (x + w, y + h), (0, 255, 255), 2)
+                cv.putText(img_result, "Color Tracker", (x, y-10), 
+                           cv.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
+                
+                # Mise à jour
+                new_cx = int(x + w / 2)
+                new_cy = int(y + h / 2)
+                self.last_center = (new_cx, new_cy)
+                self.last_area = cv.contourArea(best_contour)
+                
+                cv.circle(img_result, (new_cx, new_cy), 5, (0, 0, 255), -1)
+
+        return img_result, mask
 
 # --- 2. MEAN SHIFT ---
 class MeanShiftTracker:
